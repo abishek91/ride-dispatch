@@ -1,0 +1,18 @@
+!!! 5
+%html
+  %head
+    %title= content_for(:title) || "Ride Dispatch System"
+    %meta{name: "viewport", content: "width=device-width,initial-scale=1"}
+    = csrf_meta_tags
+    = csp_meta_tag
+    = stylesheet_link_tag :app
+
+  %body
+    %h1= link_to "Ride Dispatch System", root_path
+
+    - if notice
+      %p= notice
+    - if alert
+      %p= alert
+
+    = yield

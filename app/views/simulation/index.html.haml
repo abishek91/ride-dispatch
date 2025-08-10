@@ -1,0 +1,175 @@
+%h2 Ride Dispatch System Simulation
+
+%h3 System Controls
+= form_with url: tick_path, method: :post, local: true do |f|
+  = f.submit "Advance Time (Tick)"
+= form_with url: reset_path, method: :post, local: true do |f|
+  = f.submit "Reset System", confirm: "Are you sure?"
+
+%h3 City Grid Visualization
+= render 'grid', drivers: @system_state[:drivers], riders: @system_state[:riders], ride_requests: @system_state[:ride_requests]
+
+%h3 Pending Driver Responses
+- if @system_state[:pending_assignments] && @system_state[:pending_assignments].any?
+  %p Driver assignments waiting for response:
+  %table
+    %tr
+      %th Ride Request ID
+      %th Driver ID
+      %th Pickup Location
+      %th Dropoff Location
+      %th ETA
+      %th Actions
+    - @system_state[:pending_assignments].each do |assignment|
+      %tr
+        %td= assignment[:ride_request].id[0..7]
+        %td= assignment[:driver].id[0..7]
+        %td= "(#{assignment[:ride_request].pickup_x}, #{assignment[:ride_request].pickup_y})"
+        %td= "(#{assignment[:ride_request].dropoff_x}, #{assignment[:ride_request].dropoff_y})"
+        %td= "#{assignment[:eta]} blocks"
+        %td
+          = form_with url: accept_ride_path(assignment[:ride_request].id), method: :post, local: true do |f|
+            = f.submit "Accept"
+          = form_with url: reject_ride_path(assignment[:ride_request].id), method: :post, local: true do |f|
+            = f.submit "Reject"
+- else
+  %p No pending driver responses.
+
+%h3 Entity Management
+
+%h4 Add Driver
+= form_with url: drivers_path, method: :post, local: true do |f|
+  %p
+    = f.label :x, "X Coordinate:"
+    = f.number_field :x, min: 0, max: 99, value: 0
+  %p
+    = f.label :y, "Y Coordinate:"
+    = f.number_field :y, min: 0, max: 99, value: 0
+  %p
+    = f.submit "Add Driver"
+
+%h4 Add Rider
+= form_with url: riders_path, method: :post, local: true do |f|
+  %p
+    = f.label :pickup_x, "Pickup X:"
+    = f.number_field :pickup_x, min: 0, max: 99, value: 10
+  %p
+    = f.label :pickup_y, "Pickup Y:"
+    = f.number_field :pickup_y, min: 0, max: 99, value: 10
+  %p
+    = f.label :dropoff_x, "Dropoff X:"
+    = f.number_field :dropoff_x, min: 0, max: 99, value: 20
+  %p
+    = f.label :dropoff_y, "Dropoff Y:"
+    = f.number_field :dropoff_y, min: 0, max: 99, value: 20
+  %p
+    = f.submit "Add Rider"
+
+%h3 System Statistics
+
+%h4 Drivers
+%p Total: #{@system_state[:statistics][:drivers][:total]}
+%p Available: #{@system_state[:statistics][:drivers][:available]}
+%p On Trip: #{@system_state[:statistics][:drivers][:on_trip]}
+%p Offline: #{@system_state[:statistics][:drivers][:offline]}
+%p Total Rides Completed: #{@system_state[:statistics][:drivers][:total_rides_completed]}
+
+%h4 Riders
+%p Total: #{@system_state[:statistics][:riders][:total]}
+
+%h4 Ride Requests
+%p Total: #{@system_state[:statistics][:ride_requests][:total]}
+%p Waiting: #{@system_state[:statistics][:ride_requests][:waiting]}
+%p Pending Driver Response: #{@system_state[:statistics][:ride_requests][:pending_driver_response]}
+%p Assigned: #{@system_state[:statistics][:ride_requests][:assigned]}
+%p En Route: #{@system_state[:statistics][:ride_requests][:driver_en_route]}
+%p Arrived: #{@system_state[:statistics][:ride_requests][:driver_arrived]}
+%p Picked Up: #{@system_state[:statistics][:ride_requests][:rider_picked_up]}
+%p Completed: #{@system_state[:statistics][:ride_requests][:completed]}
+%p Rejected: #{@system_state[:statistics][:ride_requests][:rejected]}
+%p Failed: #{@system_state[:statistics][:ride_requests][:failed]}
+%p Total Rejections: #{@system_state[:statistics][:ride_requests][:total_rejections]}
+
+%h3 Current Entities
+
+%h4 Drivers (#{@system_state[:drivers].count})
+- if @system_state[:drivers].any?
+  %table
+    %tr
+      %th ID
+      %th Location
+      %th Status
+      %th Target
+      %th Rides Completed
+      %th Fairness Score
+      %th Actions
+    - @system_state[:drivers].each do |driver|
+      %tr
+        %td= driver[:id][0..7]
+        %td= "(#{driver[:x]}, #{driver[:y]})"
+        %td= driver[:status].humanize
+        %td
+          - if driver[:target_x] && driver[:target_y]
+            = "(#{driver[:target_x]}, #{driver[:target_y]})"
+          - else
+            None
+        %td= driver[:total_rides_completed]
+        %td= driver[:fairness_score].round(1)
+        %td
+          = form_with url: driver_path(driver[:id]), method: :delete, local: true do |f|
+            = f.submit "Remove"
+          - if driver[:status] == 'available'
+            = form_with url: update_status_driver_path(driver[:id]), method: :patch, local: true do |f|
+              = f.hidden_field :status, value: 'offline'
+              = f.submit "Go Offline"
+          - elsif driver[:status] == 'offline'
+            = form_with url: update_status_driver_path(driver[:id]), method: :patch, local: true do |f|
+              = f.hidden_field :status, value: 'available'
+              = f.submit "Go Online"
+- else
+  %p No drivers in the system.
+
+%h4 Riders (#{@system_state[:riders].count})
+- if @system_state[:riders].any?
+  %table
+    %tr
+      %th ID
+      %th Pickup Location
+      %th Dropoff Location
+      %th Actions
+    - @system_state[:riders].each do |rider|
+      %tr
+        %td= rider[:id][0..7]
+        %td= "(#{rider[:pickup_x]}, #{rider[:pickup_y]})"
+        %td= "(#{rider[:dropoff_x]}, #{rider[:dropoff_y]})"
+        %td
+          = form_with url: rider_path(rider[:id]), method: :delete, local: true do |f|
+            = f.submit "Remove"
+          = form_with url: ride_requests_path, method: :post, local: true do |f|
+            = f.hidden_field :rider_id, value: rider[:id]
+            = f.submit "Request Ride"
+- else
+  %p No riders in the system.
+
+%h4 Ride Requests (#{@system_state[:ride_requests].count})
+- if @system_state[:ride_requests].any?
+  %table
+    %tr
+      %th ID
+      %th Rider ID
+      %th Driver ID
+      %th Pickup
+      %th Dropoff
+      %th Status
+      %th Rejections
+    - @system_state[:ride_requests].each do |request|
+      %tr
+        %td= request[:id][0..7]
+        %td= request[:rider_id][0..7]
+        %td= request[:driver_id] ? request[:driver_id][0..7] : "None"
+        %td= "(#{request[:pickup_x]}, #{request[:pickup_y]})"
+        %td= "(#{request[:dropoff_x]}, #{request[:dropoff_y]})"
+        %td= request[:status].humanize
+        %td= request[:rejection_count]
+- else
+  %p No ride requests in the system.

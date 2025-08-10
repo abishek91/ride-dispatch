@@ -1,0 +1,45 @@
+%h4 Legend:
+%p D = Driver, R = Rider (waiting for pickup or available), DR = Driver with Rider (traveling), ↓ = Dropoff, → = Target
+
+%table{style: "border-collapse: collapse; font-size: 8px; table-layout: fixed;"}
+  - (0...100).each do |y|
+    %tr
+      - (0...100).each do |x|
+        - cell_content = []
+
+        - # Check for drivers at this location
+        - drivers_here = drivers.select { |d| d[:x] == x && d[:y] == y }
+        - drivers_here.each do |driver|
+          - cell_content << "D"
+
+          - # If this driver has a picked up rider, show them together
+          - if driver[:status] == "on_trip" && driver[:current_ride_request_id]
+            - ride_request = ride_requests.find { |r| r[:id] == driver[:current_ride_request_id] && r[:status] == "rider_picked_up" }
+            - if ride_request
+              - cell_content << "R"
+
+        - # Check for riders at this location (pickup) - only show if not picked up
+        - ride_requests.select { |r| r[:pickup_x] == x && r[:pickup_y] == y && !["rider_picked_up", "completed", "failed", "rejected"].include?(r[:status]) }.each do |ride_request|
+          - cell_content << "R"
+
+        - # Check for riders at their current location (after dropoff)
+        - riders.select { |r| r[:x] == x && r[:y] == y }.each do |rider|
+          - # Only show if rider doesn't have an active ride request
+          - active_request = ride_requests.find { |req| req[:rider_id] == rider[:id] && ["waiting", "pending_driver_response", "assigned", "driver_en_route", "driver_arrived", "rider_picked_up"].include?(req[:status]) }
+          - unless active_request
+            - cell_content << "R"
+
+        - # Check for dropoff locations - only for active requests
+        - ride_requests.select { |r| r[:dropoff_x] == x && r[:dropoff_y] == y && !["completed", "failed", "rejected"].include?(r[:status]) }.each do |dropoff|
+          - cell_content << "↓"
+
+        - # Check for driver targets
+        - targets_here = drivers.select { |d| d[:target_x] == x && d[:target_y] == y && !drivers_here.include?(d) }
+        - targets_here.each do |target|
+          - cell_content << "→"
+
+        %td{title: "Location: (#{x}, #{y})", style: "border: 1px solid #ddd; width: 12px; height: 12px; min-width: 12px; max-width: 12px; text-align: center; padding: 0; font-size: 8px; vertical-align: middle; overflow: hidden; white-space: nowrap;"}
+          - if cell_content.any?
+            = cell_content.join("")
+          - else
+            &nbsp;

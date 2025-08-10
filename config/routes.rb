@@ -9,6 +9,27 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  # Defines the root path route ("/")
-  # root "posts#index"
+  # Main simulation interface
+  root "simulation#index"
+
+  # Simulation controls
+  post "tick", to: "simulation#tick"
+  post "reset", to: "simulation#reset"
+
+  # Driver management
+  resources :drivers, only: [ :create, :destroy ] do
+    member do
+      patch :update_status
+    end
+  end
+
+  # Rider management
+  resources :riders, only: [ :create, :destroy ]
+
+  # Ride request management
+  resources :ride_requests, only: [ :create ]
+
+  # Driver responses to ride assignments
+  post "driver_responses/:ride_request_id/accept", to: "driver_responses#accept", as: :accept_ride
+  post "driver_responses/:ride_request_id/reject", to: "driver_responses#reject", as: :reject_ride
 end
